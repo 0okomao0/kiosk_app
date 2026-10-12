@@ -20,6 +20,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
@@ -203,10 +205,19 @@ fun KioskApp(settings: Settings) {
             }
         )
 
-        SecretTapZone(
-            modifier = Modifier.align(Alignment.TopEnd),
-            onTriggered = { showPin = true }
-        )
+        // 日付表示（画面左寄り・下部）の位置に重ねる
+        Column(modifier = Modifier.fillMaxSize()) {
+            Spacer(Modifier.weight(0.74f))
+            Row(modifier = Modifier.weight(0.16f).fillMaxWidth()) {
+                Spacer(Modifier.weight(0.08f))
+                SecretTapZone(
+                    modifier = Modifier.weight(0.40f).fillMaxSize(),
+                    onTriggered = { showPin = true }
+                )
+                Spacer(Modifier.weight(0.52f))
+            }
+            Spacer(Modifier.weight(0.10f))
+        }
     }
 
     if (showPin) {
@@ -243,7 +254,6 @@ fun SecretTapZone(modifier: Modifier, onTriggered: () -> Unit) {
 
     Box(
         modifier = modifier
-            .size(96.dp)
             .pointerInput(Unit) {
                 detectTapGestures {
                     val now = SystemClock.elapsedRealtime()
