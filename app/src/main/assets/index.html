@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ja"><head>
+    <meta charset="utf-8">
+    <style>
+        html{margin:0;height:100%;overflow:hidden}
+        body{margin:0;height:100%;overflow:hidden;background:var(--background-color,#002b36);color:var(--foreground-color,#839496);
+          font-family:sans-serif}
+        body.light-mode{--background-color:#fdf6e3;--foreground-color:#657b83;--secondary-color:#586e75;--muted-color:#93a1a1}
+        .wrap{display:grid;grid-template-columns:1.1fr 1fr;gap:3vw;
+          height:100vh;padding:5vh 4vw;box-sizing:border-box}
+        .left{display:flex;flex-direction:column;justify-content:center}
+        .wrap.no-memo{grid-template-columns:1fr}
+        .wrap.no-memo .left{position:relative;align-items:center;text-align:center}
+        .wrap.no-memo #time{position:absolute;top:51%;left:28%;transform:translate(-50%,-50%);font-size:37vh;font-weight:400}
+        .wrap.no-memo #date{position:absolute;top:77%;left:28%;transform:translateX(-50%);margin:0}
+        .wrap.no-memo #weather{position:absolute;top:7%;left:0;margin:0;gap:1vw}
+        .wrap.no-memo #icon{font-size:12vh}
+        .wrap.no-memo #temp{font-size:7vh}
+        .wrap.no-memo #detail{font-size:3.5vh}
+        #calendar{display:none}
+        .wrap.no-memo #calendar{display:block;position:absolute;top:52%;right:2.5%;width:36vw;max-width:340px;transform:translateY(-50%);text-align:center;touch-action:pan-x}
+        #memo-banner{display:none;position:absolute;top:11.3vh;right:2.5%;width:36vw;max-width:340px;max-height:22vh;overflow:hidden;text-align:right;white-space:normal;overflow-wrap:anywhere;line-height:1.25;font-weight:600}
+        #memo-banner.visible{display:block}
+        #memo-banner.memo-short{font-size:5vh}
+        #memo-banner.memo-medium{font-size:4.2vh}
+        #memo-banner.memo-long{font-size:3.5vh;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+        #calendar-content{will-change:transform,opacity}
+        #calendar-title{font-size:5vh;font-weight:500;margin-bottom:1.5vh}
+        .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.6vh .4vw}
+        .calendar-cell{display:flex;align-items:center;justify-content:center;min-height:5.5vh;font-size:4.2vh;border-radius:50%}
+        .calendar-weekday{font-size:3.5vh;color:var(--secondary-color,#93a1a1);min-height:4vh}
+        .calendar-sunday,.calendar-holiday{color:#dc322f}
+        .calendar-saturday{color:#268bd2}
+        .calendar-today{background:#b58900;color:#fdf6e3;font-weight:700}
+        body.light-mode .calendar-today{color:#fdf6e3}
+        .wrap.no-memo .right{display:none}
+        #time{display:inline-flex;align-items:center;font-size:26vh;font-weight:300;line-height:1}
+        #colon{margin:0 .09em;transform:translateY(-.04em)}
+        #date{font-size:7vh;margin-top:1vh;color:var(--secondary-color,#93a1a1)}
+        #weather{display:flex;align-items:center;gap:2vw;margin-top:5vh}
+        #icon{font-size:15vh;line-height:1}
+        #temp{font-size:10vh;font-weight:500}
+        #detail{font-size:4.5vh;font-weight:500;color:var(--secondary-color,#93a1a1)}
+        .right{display:flex;flex-direction:column;padding-top:10vh;min-height:0}
+        .label{font-size:4vh;color:var(--muted-color,#586e75);margin-bottom:1vh}
+        #memo{font-size:5.5vh;line-height:1.4;white-space:pre-wrap;
+          word-break:break-word;overflow:hidden}
+        #admin{position:fixed;left:2vw;bottom:1vh;font-size:3vh;color:var(--muted-color,#586e75);opacity:.75}
+    </style></head>
+<body>
+<div class="wrap">
+    <div class="left">
+        <div id="time"><span id="hour">--</span><span id="colon">:</span><span id="minute">--</span></div>
+        <div id="date"></div>
+        <div id="weather">
+            <div id="icon"></div>
+            <div><div id="temp">--</div><div id="detail"></div></div>
+        </div>
+        <div id="calendar">
+            <div id="calendar-content">
+                <div id="calendar-title"></div>
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+        </div>
+        <div id="memo-banner"></div>
+    </div>
+</div>
+<div id="admin"></div>
+<script>
+    const $ = id => document.getElementById(id);
+    let calendarMonth = new Date();
+    calendarMonth.setDate(1);
+    let renderedCalendarKey = '';
+    function tick() {
+      const d = new Date();
+      $('hour').textContent = String(d.getHours()).padStart(2, '0');
+      $('minute').textContent = String(d.getMinutes()).padStart(2, '0');
+      $('date').textContent = d.toLocaleDateString('ja-JP',
+        { month: 'long', day: 'numeric', weekday: 'short' });
+      renderCalendar(calendarMonth, d);
+    }
+    function renderCalendar(monthDate, today) {
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const renderKey = year + '-' + month + '-' + today.getFullYear() + '-' + today.getMonth() + '-' + today.getDate();
+      if (renderKey === renderedCalendarKey) return;
+      renderedCalendarKey = renderKey;
+      $('calendar-title').textContent = year + '年' + (month + 1) + '月';
+      const grid = $('calendar-grid');
+      grid.textContent = '';
+      ['日', '月', '火', '水', '木', '金', '土'].forEach(day => {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell calendar-weekday';
+        if (day === '日') cell.classList.add('calendar-sunday');
+        if (day === '土') cell.classList.add('calendar-saturday');
+        cell.textContent = day;
+        grid.appendChild(cell);
+      });
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const holidays = japaneseHolidays(year);
+      for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(document.createElement('div'));
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell';
+        cell.textContent = day;
+        const weekday = new Date(year, month, day).getDay();
+        if (weekday === 0) cell.classList.add('calendar-sunday');
+        else if (weekday === 6) cell.classList.add('calendar-saturday');
+        if (holidays.has(dateKey(year, month, day))) {
+          cell.classList.remove('calendar-saturday');
+          cell.classList.add('calendar-holiday');
+        }
+        if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+          cell.classList.add('calendar-today');
+        }
+        grid.appendChild(cell);
+      }
+    }
+    function dateKey(year, month, day) {
+      return year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    }
+    function nthMonday(year, month, nth) {
+      const firstMonday = 1 + (8 - new Date(year, month, 1).getDay()) % 7;
+      return firstMonday + (nth - 1) * 7;
+    }
+    function vernalEquinoxDay(year) {
+      const base = year < 1980 ? 20.8357 : 20.8431;
+      return Math.floor(base + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    }
+    function autumnalEquinoxDay(year) {
+      const base = year < 1980 ? 23.2588 : 23.2488;
+      return Math.floor(base + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    }
+    function japaneseHolidays(year) {
+      const holidays = new Set();
+      const add = (month, day) => holidays.add(dateKey(year, month - 1, day));
+
+      add(1, 1);
+      add(1, year >= 2000 ? nthMonday(year, 0, 2) : 15);
+      if (year >= 1967) add(2, 11);
+      if (year >= 2020) add(2, 23);
+      else if (year >= 1989 && year <= 2018) add(12, 23);
+      else if (year >= 1949 && year <= 1988) add(4, 29);
+
+      if (year >= 2007) add(4, 29);
+      else if (year >= 1989 && year <= 2006) add(4, 29);
+      add(3, vernalEquinoxDay(year));
+      add(5, 3);
+      if (year >= 2007) add(5, 4);
+      add(5, 5);
+
+      if (year >= 2020 && year <= 2021) {
+        add(7, year === 2020 ? 23 : 22);
+        add(7, year === 2020 ? 24 : 23);
+      } else if (year >= 2003) {
+        add(7, nthMonday(year, 6, 3));
+      } else if (year >= 1996) {
+        add(7, 20);
+      }
+      if (year >= 2016) {
+        add(8, year === 2020 ? 10 : year === 2021 ? 8 : 11);
+      }
+      if (year >= 2003) add(9, nthMonday(year, 8, 3));
+      else if (year >= 1966) add(9, 15);
+      add(9, autumnalEquinoxDay(year));
+
+      if (year < 2020 || year > 2021) {
+        if (year >= 2000) add(10, nthMonday(year, 9, 2));
+        else if (year >= 1966) add(10, 10);
+      }
+      add(11, 3);
+      add(11, 23);
+      if (year >= 1989 && year <= 2018) add(12, 23);
+
+      if (year === 2019) {
+        add(5, 1);
+        add(10, 22);
+      }
+
+      if (year >= 1986) {
+        for (let day = 2; day <= 30; day++) {
+          const key = dateKey(year, 4, day);
+          const weekday = new Date(year, 3, day).getDay();
+          if (
+            weekday !== 0 &&
+            !holidays.has(key) &&
+            holidays.has(dateKey(year, 3, day - 1)) &&
+            holidays.has(dateKey(year, 3, day + 1))
+          ) {
+            holidays.add(key);
+          }
+        }
+        for (let month = 0; month < 12; month++) {
+          const days = new Date(year, month + 1, 0).getDate();
+          for (let day = 2; day < days; day++) {
+            const key = dateKey(year, month, day);
+            const weekday = new Date(year, month, day).getDay();
+            if (
+              weekday !== 0 &&
+              !holidays.has(key) &&
+              holidays.has(dateKey(year, month, day - 1)) &&
+              holidays.has(dateKey(year, month, day + 1))
+            ) {
+              holidays.add(key);
+            }
+          }
+        }
+      }
+
+      if (year >= 1973) {
+        const sundayHolidays = Array.from(holidays).filter(key => {
+          const [y, m, d] = key.split('-').map(Number);
+          return new Date(y, m - 1, d).getDay() === 0;
+        });
+        sundayHolidays.forEach(key => {
+          const [y, m, d] = key.split('-').map(Number);
+          const substitute = new Date(y, m - 1, d + 1);
+          while (holidays.has(dateKey(substitute.getFullYear(), substitute.getMonth(), substitute.getDate()))) {
+            substitute.setDate(substitute.getDate() + 1);
+          }
+          holidays.add(dateKey(substitute.getFullYear(), substitute.getMonth(), substitute.getDate()));
+        });
+      }
+      return holidays;
+    }
+    let calendarTouchStartY = null;
+    let calendarAnimating = false;
+    $('calendar').addEventListener('touchstart', event => {
+      calendarTouchStartY = event.changedTouches[0].screenY;
+    }, { passive: true });
+    $('calendar').addEventListener('touchend', event => {
+      if (calendarTouchStartY === null) return;
+      const deltaY = event.changedTouches[0].screenY - calendarTouchStartY;
+      calendarTouchStartY = null;
+      if (Math.abs(deltaY) < 40 || calendarAnimating) return;
+
+      const content = $('calendar-content');
+      const swipeUp = deltaY < 0;
+      const outgoingY = swipeUp ? '-25%' : '25%';
+      const incomingY = swipeUp ? '25%' : '-25%';
+      calendarAnimating = true;
+      content.style.transition = 'transform 160ms ease-in, opacity 160ms ease-in';
+      content.style.transform = 'translateY(' + outgoingY + ')';
+      content.style.opacity = '0';
+
+      setTimeout(() => {
+        calendarMonth.setMonth(calendarMonth.getMonth() + (swipeUp ? 1 : -1));
+        renderedCalendarKey = '';
+        renderCalendar(calendarMonth, new Date());
+        content.style.transition = 'none';
+        content.style.transform = 'translateY(' + incomingY + ')';
+        content.offsetHeight;
+        content.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
+        content.style.transform = 'translateY(0)';
+        content.style.opacity = '1';
+
+        setTimeout(() => {
+          content.style.transition = '';
+          content.style.transform = '';
+          content.style.opacity = '';
+          calendarAnimating = false;
+        }, 220);
+      }, 170);
+    }, { passive: true });
+    const WEATHER = {
+      0:['☀️','快晴'],1:['🌤️','晴れ'],2:['⛅','薄曇り'],3:['☁️','曇り'],
+      45:['🌫️','霧'],48:['🌫️','霧'],
+      51:['🌦️','霧雨'],53:['🌦️','霧雨'],55:['🌦️','霧雨'],
+      61:['🌧️','雨'],63:['🌧️','雨'],65:['🌧️','強い雨'],
+      66:['🌧️','氷雨'],67:['🌧️','氷雨'],
+      71:['🌨️','雪'],73:['🌨️','雪'],75:['❄️','大雪'],77:['🌨️','雪'],
+      80:['🌦️','にわか雨'],81:['🌦️','にわか雨'],82:['⛈️','激しい雨'],
+      85:['🌨️','雪'],86:['❄️','大雪'],
+      95:['⛈️','雷雨'],96:['⛈️','雷雨'],99:['⛈️','雷雨']
+    };
+    let state = { memo: '', lat: '35.68', lon: '139.69', backgroundColor: '#002b36', appearanceMode: 'dark', adminUrl: '' };
+    async function loadState() {
+      try {
+        const r = await fetch('/api/state.json', { cache: 'no-store' });
+        const s = await r.json();
+        const locationChanged = s.lat !== state.lat || s.lon !== state.lon;
+        state = s;
+        const memo = typeof s.memo === 'string'
+          ? Array.from(s.memo.trim().replace(/\s+/g, ' ')).slice(0, 40).join('')
+          : '';
+        $('memo-banner').textContent = memo;
+        const memoBanner = $('memo-banner');
+        memoBanner.classList.toggle('visible', memo.length > 0);
+        memoBanner.classList.remove('memo-short', 'memo-medium', 'memo-long');
+        if (memo.length > 0) {
+          memoBanner.classList.add(
+            memo.length <= 12 ? 'memo-short' : memo.length <= 24 ? 'memo-medium' : 'memo-long'
+          );
+        }
+        document.querySelector('.wrap').classList.add('no-memo');
+        document.body.classList.add('no-memo');
+        const backgroundColors = ['#002b36', '#073642', '#000000', '#202124', '#10243A', '#18332F'];
+        const backgroundColor = backgroundColors.includes(s.backgroundColor)
+          ? s.backgroundColor : '#002b36';
+        const lightMode = s.appearanceMode === 'light';
+        document.body.classList.toggle('light-mode', lightMode);
+        document.body.style.setProperty('--background-color', lightMode ? '#fdf6e3' : backgroundColor);
+        document.body.style.setProperty('--foreground-color', lightMode ? '#657b83' : '#839496');
+        document.body.style.setProperty('--secondary-color', lightMode ? '#586e75' : '#93a1a1');
+        document.body.style.setProperty('--muted-color', lightMode ? '#93a1a1' : '#586e75');
+        $('admin').textContent = s.adminUrl;
+        if (locationChanged) loadWeather();
+      } catch (e) {}
+    }
+    async function loadWeather() {
+      try {
+        const url = 'https://api.open-meteo.com/v1/forecast'
+          + '?latitude=' + encodeURIComponent(state.lat)
+          + '&longitude=' + encodeURIComponent(state.lon)
+          + '&current=temperature_2m,weather_code'
+          + '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+          + '&timezone=auto&forecast_days=1';
+        const j = await (await fetch(url)).json();
+        const w = WEATHER[j.current.weather_code] || ['❔', ''];
+        $('icon').textContent = w[0];
+        $('temp').textContent = Math.round(j.current.temperature_2m) + '°C ' + w[1];
+        $('detail').textContent =
+          '最高 ' + Math.round(j.daily.temperature_2m_max[0]) + '° / 最低 '
+          + Math.round(j.daily.temperature_2m_min[0]) + '° / 降水 '
+          + j.daily.precipitation_probability_max[0] + '%';
+      } catch (e) {
+        $('detail').textContent = '天気を取得できません';
+      }
+    }
+    tick(); setInterval(tick, 1000);
+    loadState().then(loadWeather);
+    setInterval(loadState, 30000);
+    setInterval(loadWeather, 15 * 60 * 1000);
+</script>
+</body></html>
