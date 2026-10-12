@@ -21,6 +21,13 @@
         .wrap.no-memo #calendar{display:block;position:absolute;top:52%;right:2.5%;width:36vw;max-width:340px;transform:translateY(-50%);text-align:center;touch-action:pan-x}
         #memo-banner{display:none;position:absolute;top:11.3vh;right:2.5%;width:36vw;max-width:340px;max-height:22vh;overflow:hidden;text-align:right;white-space:normal;overflow-wrap:anywhere;line-height:1.25;font-weight:600}
         #memo-banner.visible{display:block}
+        #sensor-banner{display:none;position:absolute;top:6vh;right:2.5%;width:36vw;max-width:340px;line-height:1.2;font-weight:600}
+        #sensor-banner.visible{display:flex;justify-content:flex-end;gap:2vw}
+        #sensor-banner .sensor{text-align:right;white-space:nowrap}
+        #sensor-banner .sensor-name{font-size:2.6vh}
+        #sensor-banner .sensor-values{display:flex;align-items:baseline;justify-content:flex-end;gap:.5vw}
+        #sensor-banner .sensor-temp{font-size:7vh}
+        #sensor-banner .sensor-hum{font-size:3.5vh}
         #memo-banner.memo-short{font-size:5vh}
         #memo-banner.memo-medium{font-size:4.2vh}
         #memo-banner.memo-long{font-size:3.5vh;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
@@ -63,6 +70,7 @@
             </div>
         </div>
         <div id="memo-banner"></div>
+        <div id="sensor-banner"></div>
     </div>
 </div>
 <div id="admin"></div>
@@ -276,7 +284,7 @@
       85:['🌨️','雪'],86:['❄️','大雪'],
       95:['⛈️','雷雨'],96:['⛈️','雷雨'],99:['⛈️','雷雨']
     };
-    let state = { memo: '', lat: '35.68', lon: '139.69', backgroundColor: '#002b36', appearanceMode: 'dark', adminUrl: '' };
+    let state = { memo: '', lat: '35.68', lon: '139.69', appearanceMode: 'dark', adminUrl: '' };
     async function loadState() {
       try {
         const r = await fetch('/api/state.json', { cache: 'no-store' });
@@ -295,14 +303,33 @@
             memo.length <= 12 ? 'memo-short' : memo.length <= 24 ? 'memo-medium' : 'memo-long'
           );
         }
+        const sensorBanner = $('sensor-banner');
+        const sensors = Array.isArray(s.sensors) ? s.sensors : [];
+        sensorBanner.textContent = '';
+        sensors.forEach(x => {
+          const col = document.createElement('div');
+          col.className = 'sensor';
+          const name = document.createElement('div');
+          name.className = 'sensor-name';
+          name.textContent = x.name || '…' + x.id;
+          const values = document.createElement('div');
+          values.className = 'sensor-values';
+          [['sensor-temp', x.temperatureC.toFixed(1) + '°C'],
+           ['sensor-hum', x.humidity + '%']].forEach(([cls, text]) => {
+            const d = document.createElement('span');
+            d.className = cls;
+            d.textContent = text;
+            values.append(d);
+          });
+          col.append(name, values);
+          sensorBanner.append(col);
+        });
+        sensorBanner.classList.toggle('visible', memo.length === 0 && sensors.length > 0);
         document.querySelector('.wrap').classList.add('no-memo');
         document.body.classList.add('no-memo');
-        const backgroundColors = ['#002b36', '#073642', '#000000', '#202124', '#10243A', '#18332F'];
-        const backgroundColor = backgroundColors.includes(s.backgroundColor)
-          ? s.backgroundColor : '#002b36';
         const lightMode = s.appearanceMode === 'light';
         document.body.classList.toggle('light-mode', lightMode);
-        document.body.style.setProperty('--background-color', lightMode ? '#fdf6e3' : backgroundColor);
+        document.body.style.setProperty('--background-color', lightMode ? '#fdf6e3' : '#002b36');
         document.body.style.setProperty('--foreground-color', lightMode ? '#657b83' : '#839496');
         document.body.style.setProperty('--secondary-color', lightMode ? '#586e75' : '#93a1a1');
         document.body.style.setProperty('--muted-color', lightMode ? '#93a1a1' : '#586e75');

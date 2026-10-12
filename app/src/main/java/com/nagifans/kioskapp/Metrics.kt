@@ -41,6 +41,9 @@ object Metrics {
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         o.put("screenOn", pm.isInteractive)
+        o.put("ambientLightSensorAvailable", AmbientLightMonitor.isAvailable)
+        o.put("ambientLightLux", AmbientLightMonitor.lux?.toDouble() ?: JSONObject.NULL)
+        o.put("switchBotBle", SwitchBotBleMonitor.json(Settings(context).sensorNames))
         o.put("uptimeSec", SystemClock.elapsedRealtime() / 1000)
         o.put("appVersion", context.packageManager.getPackageInfo(context.packageName, 0).versionName)
         o.put("androidVersion", android.os.Build.VERSION.RELEASE)

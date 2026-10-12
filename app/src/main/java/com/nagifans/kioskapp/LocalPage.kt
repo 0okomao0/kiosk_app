@@ -50,16 +50,13 @@ private fun stateResponse(context: Context, settings: Settings): WebResourceResp
         .put("lat", settings.latitude)
         .put("lon", settings.longitude)
         .put(
-            "backgroundColor",
-            settings.backgroundColor.takeIf { it in Settings.BACKGROUND_COLORS }
-                ?: Settings.DEFAULT_BACKGROUND_COLOR
-        )
-        .put(
             "appearanceMode",
             settings.appearanceMode.takeIf {
                 it == Settings.APPEARANCE_DARK || it == Settings.APPEARANCE_LIGHT
             } ?: Settings.APPEARANCE_DARK
         )
+        .put("automaticAppearance", settings.automaticAppearance)
+        .put("sensors", SwitchBotBleMonitor.readings(settings.sensorNames))
         .put("adminUrl", if (ip != null) "http://$ip:8080/" else "")
     return WebResourceResponse("application/json", "utf-8", json.toString().byteInputStream())
         .apply { responseHeaders = mapOf("Cache-Control" to "no-store") }

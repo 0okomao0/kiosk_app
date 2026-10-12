@@ -1,13 +1,18 @@
 package com.nagifans.kioskapp
 
 import android.app.admin.DevicePolicyManager
+import android.Manifest
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.WindowManager
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -43,12 +48,21 @@ import androidx.lifecycle.lifecycleScope
 
 class MainActivity : ComponentActivity() {
     private var server: AdminServer? = null
+    private val blePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                SwitchBotBleMonitor.start(applicationContext)
+            } else {
+                SwitchBotBleMonitor.permissionRequired()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableKioskMode()
         val settings = Settings(applicationContext)
+        AmbientLightMonitor.start(applicationContext, settings)
         KioskState.url.value = settings.url
         KioskState.brightness.value = settings.brightness
         server = AdminServer(applicationContext, settings).also {
@@ -56,6 +70,7 @@ class MainActivity : ComponentActivity() {
         }
         SleepScheduler(applicationContext, settings).start(lifecycleScope)
         setContent { KioskApp(settings) }
+        window.decorView.post { startSwitchBotScan() }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -73,7 +88,46 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         server?.stop()
+        SwitchBotBleMonitor.stop()
+        AmbientLightMonitor.stop()
         super.onDestroy()
+    }
+
+    private fun startSwitchBotScan() {
+        val settings = Settings(applicationContext)
+        SwitchBotBleMonitor.setAllowedAddresses(settings.sensorAddresses)
+        if (!settings.sensorEnabled) {
+            SwitchBotBleMonitor.disable()
+            return
+        }
+        if (SwitchBotBleMonitor.hasScanPermission(this)) {
+            SwitchBotBleMonitor.start(applicationContext)
+            return
+        }
+
+        SwitchBotBleMonitor.permissionRequired()
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Manifest.permission.BLUETOOTH_SCAN
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        val message = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            "Android 11ではBLE検索に位置情報の権限が必要です。このアプリは位置情報を取得・保存せず、SwitchBotのBLE広告だけを受信します。"
+        } else {
+            "近くのSwitchBot温湿度計のBLE広告を受信するために、付近のデバイスへのアクセスを許可してください。"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SwitchBot BLEの確認")
+            .setMessage(message)
+            .setNegativeButton("後で") { _, _ -> }
+            .setPositiveButton("続ける") { _, _ ->
+                if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+                    SwitchBotBleMonitor.start(applicationContext)
+                } else {
+                    blePermissionLauncher.launch(permission)
+                }
+            }
+            .show()
     }
 
     private fun enableKioskMode() {

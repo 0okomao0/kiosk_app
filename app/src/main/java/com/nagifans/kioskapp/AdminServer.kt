@@ -68,15 +68,28 @@ class AdminServer(
                     .trim()
                     .takeCodePoints(40)
                 "/memo/clear" -> settings.memo = ""
-                "/background" -> {
-                    val color = session.parms["color"].orEmpty()
-                    if (color in Settings.BACKGROUND_COLORS) settings.backgroundColor = color
-                }
                 "/appearance" -> {
                     val mode = session.parms["mode"].orEmpty()
                     if (mode == Settings.APPEARANCE_DARK || mode == Settings.APPEARANCE_LIGHT) {
                         settings.appearanceMode = mode
                     }
+                    settings.automaticAppearance = session.parms["automatic"] == "on"
+                    AmbientLightMonitor.applyCurrentReading(settings)
+                }
+                "/sensors" -> {
+                    settings.sensorEnabled = session.parms["enabled"] == "on"
+                    settings.sensorAddresses = session.parms["addresses"].orEmpty()
+                        .split(Regex("[\\s,;]+"))
+                        .map { SwitchBotBleMonitor.normalizeAddress(it) }
+                        .filter { it.length == 12 && it.all { c -> c in '0'..'9' || c in 'A'..'F' } }
+                        .toSet()
+                    val names = settings.sensorNames.toMutableMap()
+                    SwitchBotBleMonitor.knownIds().forEach { id ->
+                        val name = session.parms["name_$id"]?.trim()?.takeCodePoints(8) ?: return@forEach
+                        if (name.isEmpty()) names.remove(id) else names[id] = name
+                    }
+                    settings.sensorNames = names
+                    SwitchBotBleMonitor.applySettings(context, settings)
                 }
                 "/location" -> {
                     val lat = session.parms["lat"]?.trim()?.toDoubleOrNull()
@@ -90,6 +103,17 @@ class AdminServer(
             return redirect()
         }
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page())
+    }
+
+    private fun sensorNameInputs(): String {
+        val ids = SwitchBotBleMonitor.knownIds()
+        if (ids.isEmpty()) return "<p>センサーを受信後に名前を付けられます</p>"
+        val names = settings.sensorNames
+        val detected = SwitchBotBleMonitor.detectedAddresses()
+            .joinToString("<br>") { esc(it.chunked(2).joinToString(":")) }
+        return "<p>受信中のMAC:<br>$detected</p>" + ids.joinToString("") {
+            "<label>…${esc(it)}の名前</label><input name=\"name_${esc(it)}\" maxlength=\"8\" value=\"${esc(names[it].orEmpty())}\">"
+        }
     }
 
     private fun redirect() =
@@ -149,22 +173,9 @@ class AdminServer(
             <option value="dark" ${if (settings.appearanceMode == Settings.APPEARANCE_DARK) "selected" else ""}>Solarized Dark</option>
             <option value="light" ${if (settings.appearanceMode == Settings.APPEARANCE_LIGHT) "selected" else ""}>Solarized Light</option>
           </select>
+          <label><input type="checkbox" name="automatic" style="width:auto" ${if (settings.automaticAppearance) "checked" else ""}> 周囲の明るさによって表示モードを変更</label>
+          <p>（照度70 lx未満でSolarized Dark、120 lx超でSolarized Lightに切り替え）</p>
           <button type="submit">表示モードを保存</button>
-        </form>
-
-        <hr style="margin:2em 0">
-        <h3>背景色</h3>
-        <p>背景色はダークモード時に使用します。</p>
-        <form method="post" action="/background">
-          <select name="color" style="width:100%;padding:.6em;margin:.3em 0 1em">
-            <option value="#002b36" ${if (settings.backgroundColor == "#002b36") "selected" else ""}>Solarized Dark</option>
-            <option value="#073642" ${if (settings.backgroundColor == "#073642") "selected" else ""}>Solarized Dark (少し明るめ)</option>
-            <option value="#000000" ${if (settings.backgroundColor == "#000000") "selected" else ""}>黒</option>
-            <option value="#202124" ${if (settings.backgroundColor == "#202124") "selected" else ""}>濃いグレー</option>
-            <option value="#10243A" ${if (settings.backgroundColor == "#10243A") "selected" else ""}>濃い紺</option>
-            <option value="#18332F" ${if (settings.backgroundColor == "#18332F") "selected" else ""}>濃い緑</option>
-          </select>
-          <button type="submit">背景色を保存</button>
         </form>
 
         <hr style="margin:2em 0">
@@ -177,14 +188,39 @@ class AdminServer(
           <button type="submit">保存</button>
         </form>
         <hr style="margin:2em 0">
-        <h3>デバイス状態</h3>
-        <table id="metrics" style="width:100%;border-collapse:collapse"></table>
+        <h3>SwitchBot温湿度計（メモが空のとき右上に表示）</h3>
+        <form method="post" action="/sensors">
+          <label><input type="checkbox" name="enabled" style="width:auto" ${if (settings.sensorEnabled) "checked" else ""}> 温湿度の取得・表示を有効にする</label><br>
+          <label>対象のBLE MACアドレス（1行に1つ。空欄なら近くの温湿度計すべて）</label>
+          <textarea name="addresses" rows="3" placeholder="AA:BB:CC:DD:EE:FF">${esc(settings.sensorAddresses.joinToString("\n") { it.chunked(2).joinToString(":") })}</textarea>
+          ${sensorNameInputs()}
+          <button type="submit">保存</button>
+        </form>
+        <hr style="margin:2em 0">
+        <h3>デバイス状態：30秒ごとに更新</h3>
+          <table id="metrics" style="width:100%;border-collapse:collapse"></table>
         <script>
         const rows = [
           ['電池', m => m.batteryPercent + '% ' + (m.charging ? '(充電中)' : '') + ' / ' + m.batteryTempC + '℃'],
           ['メモリ空き', m => m.memAvailMb + ' / ' + m.memTotalMb + ' MB'],
           ['ストレージ空き', m => m.storageFreeMb + ' / ' + m.storageTotalMb + ' MB'],
           ['Wi-Fi電波', m => m.wifiRssiDbm + ' dBm'],
+          ['周囲の明るさ', m => !m.ambientLightSensorAvailable ? 'センサーなし' : m.ambientLightLux === null ? '測定中...' : m.ambientLightLux.toFixed(1) + ' lx'],
+          ['SwitchBot BLE', m => {
+            const status = m.switchBotBle.status;
+            if (status === 'disabled') return '無効';
+            if (status === 'scanning') return '広告をスキャン中';
+            if (status === 'permission_required') return '権限が必要です（Androidのアプリ設定を確認）';
+            if (status === 'location_off') return '端末の位置情報をONにしてください';
+            if (status === 'bluetooth_off') return 'BluetoothがOFFです';
+            if (status === 'unavailable') return 'BLEを利用できません';
+            if (status.startsWith('scan_error:')) return 'スキャンエラー: ' + status.substring(11);
+            return status;
+          }],
+          ['SwitchBot温湿度', m => m.switchBotBle.sensors.length === 0 ? '直近5分の受信なし' :
+            m.switchBotBle.sensors.map(s =>
+              (s.name || '…' + s.id) + ': ' + s.temperatureC.toFixed(1) + '℃ / ' + s.humidity + '% / 電池' + s.battery + '% / ' + s.ageSec + '秒前'
+            ).join(' | ')],
           ['IP', m => m.ip],
           ['画面', m => m.screenOn ? 'ON' : 'OFF'],
           ['稼働時間', m => Math.floor(m.uptimeSec / 3600) + '時間' + Math.floor(m.uptimeSec % 3600 / 60) + '分'],
@@ -211,15 +247,16 @@ class AdminServer(
         <hr style="margin:2em 0">
         <h3>明るさ</h3>
         <form method="post" action="/brightness">
-          <label>明るさ(0=自動, 1〜100)</label>
+          <label>画面の明るさ(0=端末設定に任せる, 1〜100=固定%)</label>
           <input name="value" type="number" min="0" max="100" value="${settings.brightness}">
+          <p>（0の場合はAndroidの画面輝度設定に従うため端末側で自動輝度が有効であることを確認すること）</p>
           <button type="submit">適用</button>
         </form>
 
         <hr style="margin:2em 0">
         <h3>夜間消灯</h3>
         <form method="post" action="/schedule">
-          <label><input type="checkbox" name="enabled" style="width:auto" ${if (settings.sleepEnabled) "checked" else ""}> 有効にする</label>
+          <label><input type="checkbox" name="enabled" style="width:auto" ${if (settings.sleepEnabled) "checked" else ""}> 有効にする</label><br>
           <label>消灯時刻</label>
           <input name="start" type="time" value="${esc(settings.sleepStart)}" required>
           <label>点灯時刻</label>

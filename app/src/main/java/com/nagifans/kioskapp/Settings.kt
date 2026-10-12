@@ -20,10 +20,8 @@ class Settings(context: Context) {
     companion object {
         const val DEFAULT_URL = "https://appassets.androidplatform.net/assets/index.html"
         const val DEFAULT_PIN = "1234"
-        const val DEFAULT_BACKGROUND_COLOR = "#002b36"
         const val APPEARANCE_DARK = "dark"
         const val APPEARANCE_LIGHT = "light"
-        val BACKGROUND_COLORS = setOf("#002b36", "#073642", "#000000", "#202124", "#10243A", "#18332F")
     }
     var sleepEnabled: Boolean
         get() = prefs.getBoolean("sleepEnabled", false)
@@ -40,13 +38,28 @@ class Settings(context: Context) {
         get() = prefs.getString("memo", "") ?: ""
         set(value) = prefs.edit().putString("memo", value).apply()
 
-    var backgroundColor: String
-        get() = prefs.getString("backgroundColor", DEFAULT_BACKGROUND_COLOR) ?: DEFAULT_BACKGROUND_COLOR
-        set(value) = prefs.edit().putString("backgroundColor", value).apply()
-
     var appearanceMode: String
         get() = prefs.getString("appearanceMode", APPEARANCE_DARK) ?: APPEARANCE_DARK
         set(value) = prefs.edit().putString("appearanceMode", value).apply()
+
+    var automaticAppearance: Boolean
+        get() = prefs.getBoolean("automaticAppearance", false)
+        set(value) = prefs.edit().putBoolean("automaticAppearance", value).apply()
+
+    var sensorNames: Map<String, String>
+        get() = try {
+            val o = org.json.JSONObject(prefs.getString("sensorNames", "{}") ?: "{}")
+            o.keys().asSequence().associateWith { o.optString(it) }
+        } catch (e: org.json.JSONException) { emptyMap() }
+        set(value) = prefs.edit().putString("sensorNames", org.json.JSONObject(value).toString()).apply()
+
+    var sensorEnabled: Boolean
+        get() = prefs.getBoolean("sensorEnabled", true)
+        set(value) = prefs.edit().putBoolean("sensorEnabled", value).apply()
+
+    var sensorAddresses: Set<String>
+        get() = (prefs.getString("sensorAddresses", "") ?: "").split(',').filter { it.isNotEmpty() }.toSet()
+        set(value) = prefs.edit().putString("sensorAddresses", value.joinToString(",")).apply()
 
     var latitude: String
         get() = prefs.getString("lat", "35.68") ?: "35.68"
