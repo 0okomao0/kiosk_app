@@ -61,6 +61,10 @@ class Settings(context: Context) {
         get() = prefs.getInt("lightAboveLux", 120)
         set(value) = prefs.edit().putInt("lightAboveLux", value).apply()
 
+    var lastUpdateResult: String
+        get() = prefs.getString("lastUpdateResult", "") ?: ""
+        set(value) = prefs.edit().putString("lastUpdateResult", value).apply()
+
     var sensorEnabled: Boolean
         get() = prefs.getBoolean("sensorEnabled", true)
         set(value) = prefs.edit().putBoolean("sensorEnabled", value).apply()

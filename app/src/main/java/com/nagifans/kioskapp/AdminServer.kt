@@ -97,6 +97,21 @@ class AdminServer(
                     settings.sensorNames = names
                     SwitchBotBleMonitor.applySettings(context, settings)
                 }
+                "/update" -> {
+                    val path = params["apk"]
+                    settings.lastUpdateResult = if (path == null) {
+                        "APKが選択されていません"
+                    } else {
+                        val file = java.io.File(path)
+                        try {
+                            AppUpdater.install(context, file)
+                        } catch (e: Exception) {
+                            "更新を開始できません: ${e.message}"
+                        } finally {
+                            file.delete()
+                        }
+                    }
+                }
                 "/location" -> {
                     val lat = session.parms["lat"]?.trim()?.toDoubleOrNull()
                     val lon = session.parms["lon"]?.trim()?.toDoubleOrNull()
@@ -205,6 +220,13 @@ class AdminServer(
           <textarea name="addresses" rows="3" placeholder="AA:BB:CC:DD:EE:FF">${esc(settings.sensorAddresses.joinToString("\n") { it.chunked(2).joinToString(":") })}</textarea>
           ${sensorNameInputs()}
           <button type="submit">保存</button>
+        </form>
+        <hr style="margin:2em 0">
+        <h3>アプリ更新</h3>
+        <form method="post" action="/update" enctype="multipart/form-data" onsubmit="return confirm('APKをインストールします。成功するとアプリが再起動します。')">
+          <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive">
+          <p>前回の結果: ${esc(settings.lastUpdateResult.ifEmpty { "なし" })}</p>
+          <button type="submit">アップロードして更新</button>
         </form>
         <hr style="margin:2em 0">
         <h3>デバイス状態：30秒ごとに更新</h3>
