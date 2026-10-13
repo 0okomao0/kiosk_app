@@ -61,6 +61,14 @@ class Settings(context: Context) {
         get() = prefs.getInt("lightAboveLux", 120)
         set(value) = prefs.edit().putInt("lightAboveLux", value).apply()
 
+    var autoUpdate: Boolean
+        get() = prefs.getBoolean("autoUpdate", true)
+        set(value) = prefs.edit().putBoolean("autoUpdate", value).apply()
+
+    var lastUpdateCheck: Long
+        get() = prefs.getLong("lastUpdateCheck", 0L)
+        set(value) = prefs.edit().putLong("lastUpdateCheck", value).apply()
+
     var lastUpdateResult: String
         get() = prefs.getString("lastUpdateResult", "") ?: ""
         set(value) = prefs.edit().putString("lastUpdateResult", value).apply()

@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
             try { it.start() } catch (e: java.io.IOException) { /* ポート使用中などは無視 */ }
         }
         SleepScheduler(applicationContext, settings).start(lifecycleScope)
+        UpdateChecker.start(lifecycleScope, applicationContext, settings)
         setContent { KioskApp(settings) }
         window.decorView.post { startSwitchBotScan() }
     }

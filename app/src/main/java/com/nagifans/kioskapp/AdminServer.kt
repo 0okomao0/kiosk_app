@@ -97,6 +97,10 @@ class AdminServer(
                     settings.sensorNames = names
                     SwitchBotBleMonitor.applySettings(context, settings)
                 }
+                "/update-settings" -> {
+                    settings.autoUpdate = session.parms["auto"] == "on"
+                    if (session.parms["checkNow"] != null) UpdateChecker.checkInBackground(context, settings)
+                }
                 "/update" -> {
                     val path = params["apk"]
                     settings.lastUpdateResult = if (path == null) {
@@ -124,6 +128,12 @@ class AdminServer(
             return redirect()
         }
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page())
+    }
+
+    private fun lastCheckText(): String {
+        val t = settings.lastUpdateCheck
+        if (t == 0L) return "未確認"
+        return java.text.SimpleDateFormat("M/d HH:mm", java.util.Locale.JAPAN).format(java.util.Date(t))
     }
 
     private fun sensorNameInputs(): String {
@@ -223,9 +233,15 @@ class AdminServer(
         </form>
         <hr style="margin:2em 0">
         <h3>アプリ更新</h3>
+        <form method="post" action="/update-settings">
+          <label><input type="checkbox" name="auto" style="width:auto" ${if (settings.autoUpdate) "checked" else ""}> GitHub Releasesから自動更新（6時間ごとに確認）</label>
+          <p>最終確認: ${esc(lastCheckText())} / 結果: ${esc(settings.lastUpdateResult.ifEmpty { "なし" })}</p>
+          <button type="submit">保存</button>
+          <button type="submit" name="checkNow" value="1">保存して今すぐ確認</button>
+        </form>
+        <p>手動更新（APKをアップロード）</p>
         <form method="post" action="/update" enctype="multipart/form-data" onsubmit="return confirm('APKをインストールします。成功するとアプリが再起動します。')">
           <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive">
-          <p>前回の結果: ${esc(settings.lastUpdateResult.ifEmpty { "なし" })}</p>
           <button type="submit">アップロードして更新</button>
         </form>
         <hr style="margin:2em 0">
