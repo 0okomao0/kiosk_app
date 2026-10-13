@@ -7,9 +7,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
 object AmbientLightMonitor : SensorEventListener {
-    private const val DARK_BELOW_LUX = 70f
-    private const val LIGHT_ABOVE_LUX = 120f
-
     @Volatile
     var lux: Float? = null
         private set
@@ -58,8 +55,8 @@ object AmbientLightMonitor : SensorEventListener {
         if (!appSettings.automaticAppearance) return
 
         val nextMode = when {
-            reading < DARK_BELOW_LUX -> Settings.APPEARANCE_DARK
-            reading > LIGHT_ABOVE_LUX -> Settings.APPEARANCE_LIGHT
+            reading < appSettings.darkBelowLux -> Settings.APPEARANCE_DARK
+            reading > appSettings.lightAboveLux -> Settings.APPEARANCE_LIGHT
             else -> return
         }
         appSettings.appearanceMode = nextMode

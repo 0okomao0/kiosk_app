@@ -74,6 +74,12 @@ class AdminServer(
                         settings.appearanceMode = mode
                     }
                     settings.automaticAppearance = session.parms["automatic"] == "on"
+                    val dark = session.parms["darkBelow"]?.trim()?.toIntOrNull()
+                    val light = session.parms["lightAbove"]?.trim()?.toIntOrNull()
+                    if (dark != null && light != null && dark in 0..100000 && light in 0..100000 && dark <= light) {
+                        settings.darkBelowLux = dark
+                        settings.lightAboveLux = light
+                    }
                     AmbientLightMonitor.applyCurrentReading(settings)
                 }
                 "/sensors" -> {
@@ -174,7 +180,11 @@ class AdminServer(
             <option value="light" ${if (settings.appearanceMode == Settings.APPEARANCE_LIGHT) "selected" else ""}>Solarized Light</option>
           </select>
           <label><input type="checkbox" name="automatic" style="width:auto" ${if (settings.automaticAppearance) "checked" else ""}> 周囲の明るさによって表示モードを変更</label>
-          <p>（照度70 lx未満でSolarized Dark、120 lx超でSolarized Lightに切り替え）</p>
+          <label>Darkに切り替える照度（この値未満, lx）</label>
+          <input name="darkBelow" type="number" min="0" max="100000" value="${settings.darkBelowLux}">
+          <label>Lightに切り替える照度（この値超, lx）</label>
+          <input name="lightAbove" type="number" min="0" max="100000" value="${settings.lightAboveLux}">
+          <p>（2つの値の間では現在のモードを維持します。Dark側の値はLight側以下にしてください）</p>
           <button type="submit">表示モードを保存</button>
         </form>
 
@@ -199,9 +209,11 @@ class AdminServer(
         <hr style="margin:2em 0">
         <h3>デバイス状態：30秒ごとに更新</h3>
           <table id="metrics" style="width:100%;border-collapse:collapse"></table>
+          <details style="margin-top:.5em"><summary>温度センサー一覧（詳細）</summary><p id="zones"></p></details>
         <script>
         const rows = [
-          ['電池', m => m.batteryPercent + '% ' + (m.charging ? '(充電中)' : '') + ' / ' + m.batteryTempC + '℃'],
+          ['電池', m => m.batteryPercent + '% ' + (m.charging ? '(充電中)' : '') + ' / ' + (m.batteryTempC === null ? '温度取得不可' : m.batteryTempC + '℃')],
+          ['CPU温度', m => m.cpuTempC === null ? '取得不可' : m.cpuTempC.toFixed(1) + '℃'],
           ['メモリ空き', m => m.memAvailMb + ' / ' + m.memTotalMb + ' MB'],
           ['ストレージ空き', m => m.storageFreeMb + ' / ' + m.storageTotalMb + ' MB'],
           ['Wi-Fi電波', m => m.wifiRssiDbm + ' dBm'],
@@ -239,6 +251,10 @@ class AdminServer(
               tr.insertCell().textContent = r[0];
               tr.insertCell().textContent = r[1](m);
             });
+            const zones = document.getElementById('zones');
+            zones.textContent = m.thermalZones.length === 0
+              ? '読めません（' + m.thermalZoneTotal + '個中0個）'
+              : m.thermalZones.map(z => z.type + ' ' + z.tempC.toFixed(1) + '℃').join(' / ');
           } catch (e) {}
         }
         refreshMetrics();

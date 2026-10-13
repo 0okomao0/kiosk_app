@@ -53,6 +53,14 @@ class Settings(context: Context) {
         } catch (e: org.json.JSONException) { emptyMap() }
         set(value) = prefs.edit().putString("sensorNames", org.json.JSONObject(value).toString()).apply()
 
+    var darkBelowLux: Int
+        get() = prefs.getInt("darkBelowLux", 70)
+        set(value) = prefs.edit().putInt("darkBelowLux", value).apply()
+
+    var lightAboveLux: Int
+        get() = prefs.getInt("lightAboveLux", 120)
+        set(value) = prefs.edit().putInt("lightAboveLux", value).apply()
+
     var sensorEnabled: Boolean
         get() = prefs.getBoolean("sensorEnabled", true)
         set(value) = prefs.edit().putBoolean("sensorEnabled", value).apply()

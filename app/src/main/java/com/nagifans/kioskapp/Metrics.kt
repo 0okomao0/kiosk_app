@@ -22,7 +22,8 @@ object Metrics {
             val level = bat.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val scale = bat.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
             o.put("batteryPercent", if (level >= 0 && scale > 0) level * 100 / scale else -1)
-            o.put("batteryTempC", bat.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0)
+            val batteryTemp = bat.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
+            o.put("batteryTempC", if (batteryTemp != 0.0) batteryTemp else JSONObject.NULL)
             o.put("charging", bat.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0)
         }
 
@@ -31,6 +32,10 @@ object Metrics {
         o.put("memAvailMb", mi.availMem / 1_048_576)
         o.put("memTotalMb", mi.totalMem / 1_048_576)
 
+        val (cpuTemp, thermalInfo) = Thermal.read()
+        o.put("cpuTempC", cpuTemp ?: JSONObject.NULL)
+        o.put("thermalZones", thermalInfo.getJSONArray("zones"))
+        o.put("thermalZoneTotal", thermalInfo.getInt("total"))
         val st = StatFs(Environment.getDataDirectory().path)
         o.put("storageFreeMb", st.availableBytes / 1_048_576)
         o.put("storageTotalMb", st.totalBytes / 1_048_576)

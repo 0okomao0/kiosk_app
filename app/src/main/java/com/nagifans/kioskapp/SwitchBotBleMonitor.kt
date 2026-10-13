@@ -5,6 +5,9 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.os.Handler
+import android.os.Looper
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -21,6 +24,20 @@ object SwitchBotBleMonitor {
     private const val MAX_AGE_MS = 5 * 60 * 1000L
 
     private const val TYPE_METER = 0x54
+    // Androidはフィルターなしの長時間スキャンを30分で抑制するため、定期的に張り直す
+    private const val RESTART_INTERVAL_MS = 10 * 60 * 1000L
+    private val handler = Handler(Looper.getMainLooper())
+    private var appContext: Context? = null
+    private val restartTask = object : Runnable {
+        override fun run() {
+            val ctx = appContext ?: return
+            stop()
+            start(ctx)
+            // 起動に失敗した場合も次回再試行する
+            handler.removeCallbacks(this)
+            handler.postDelayed(this, RESTART_INTERVAL_MS)
+        }
+    }
     private const val TYPE_OUTDOOR_METER = 0x77
 
     private data class Beacon(
@@ -146,10 +163,13 @@ object SwitchBotBleMonitor {
 
             try {
                 activeScanner.startScan(
-                    null,
+                    listOf(ScanFilter.Builder().setManufacturerData(SWITCHBOT_COMPANY_ID, ByteArray(0)).build()),
                     ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build(),
                     callback
                 )
+                appContext = context.applicationContext
+                handler.removeCallbacks(restartTask)
+                handler.postDelayed(restartTask, RESTART_INTERVAL_MS)
                 scanner = activeScanner
                 scanStatus = "scanning"
             } catch (e: SecurityException) {
@@ -161,6 +181,7 @@ object SwitchBotBleMonitor {
     }
 
     fun stop() {
+        handler.removeCallbacks(restartTask)
         synchronized(lock) {
             val activeScanner = scanner ?: return
             try {
