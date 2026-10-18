@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
         }
         SleepScheduler(applicationContext, settings).start(lifecycleScope)
         UpdateChecker.start(lifecycleScope, applicationContext, settings)
+        SensorUploader.start(lifecycleScope, settings)
         setContent { KioskApp(settings) }
         window.decorView.post { startSwitchBotScan() }
     }

@@ -73,6 +73,26 @@ class Settings(context: Context) {
         get() = prefs.getString("lastUpdateResult", "") ?: ""
         set(value) = prefs.edit().putString("lastUpdateResult", value).apply()
 
+    var uploadEnabled: Boolean
+        get() = prefs.getBoolean("uploadEnabled", false)
+        set(value) = prefs.edit().putBoolean("uploadEnabled", value).apply()
+
+    var uploadUrl: String
+        get() = prefs.getString("uploadUrl", "") ?: ""
+        set(value) = prefs.edit().putString("uploadUrl", value).apply()
+
+    var uploadToken: String
+        get() = prefs.getString("uploadToken", "") ?: ""
+        set(value) = prefs.edit().putString("uploadToken", value).apply()
+
+    var lastUploadAt: Long
+        get() = prefs.getLong("lastUploadAt", 0L)
+        set(value) = prefs.edit().putLong("lastUploadAt", value).apply()
+
+    var lastUploadResult: String
+        get() = prefs.getString("lastUploadResult", "") ?: ""
+        set(value) = prefs.edit().putString("lastUploadResult", value).apply()
+
     var sensorEnabled: Boolean
         get() = prefs.getBoolean("sensorEnabled", true)
         set(value) = prefs.edit().putBoolean("sensorEnabled", value).apply()

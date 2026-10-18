@@ -97,6 +97,14 @@ class AdminServer(
                     settings.sensorNames = names
                     SwitchBotBleMonitor.applySettings(context, settings)
                 }
+                "/upload" -> {
+                    val url = session.parms["url"]?.trim().orEmpty()
+                    if (url.isEmpty() || url.startsWith("https://")) settings.uploadUrl = url
+                    val token = session.parms["token"].orEmpty()
+                    if (token.isNotEmpty()) settings.uploadToken = token
+                    if (session.parms["clearToken"] != null) settings.uploadToken = ""
+                    settings.uploadEnabled = session.parms["enabled"] == "on"
+                }
                 "/update-settings" -> {
                     settings.autoUpdate = session.parms["auto"] == "on"
                     if (session.parms["checkNow"] != null) UpdateChecker.checkInBackground(context, settings)
@@ -133,6 +141,12 @@ class AdminServer(
     private fun lastCheckText(): String {
         val t = settings.lastUpdateCheck
         if (t == 0L) return "未確認"
+        return java.text.SimpleDateFormat("M/d HH:mm", java.util.Locale.JAPAN).format(java.util.Date(t))
+    }
+
+    private fun uploadTimeText(): String {
+        val t = settings.lastUploadAt
+        if (t == 0L) return "未送信"
         return java.text.SimpleDateFormat("M/d HH:mm", java.util.Locale.JAPAN).format(java.util.Date(t))
     }
 
@@ -230,6 +244,18 @@ class AdminServer(
           <textarea name="addresses" rows="3" placeholder="AA:BB:CC:DD:EE:FF">${esc(settings.sensorAddresses.joinToString("\n") { it.chunked(2).joinToString(":") })}</textarea>
           ${sensorNameInputs()}
           <button type="submit">保存</button>
+        </form>
+        <hr style="margin:2em 0">
+        <h3>温湿度の外部送信（1分ごとにPOST）</h3>
+        <form method="post" action="/upload">
+          <label><input type="checkbox" name="enabled" style="width:auto" ${if (settings.uploadEnabled) "checked" else ""}> 送信を有効にする</label>
+          <label>送信先URL（https://のみ）</label>
+          <input name="url" value="${esc(settings.uploadUrl)}" placeholder="https://example.com/ingest">
+          <label>トークン（${if (settings.uploadToken.isEmpty()) "未設定" else "設定済み"}。変更時のみ入力）</label>
+          <input name="token" type="password" autocomplete="new-password">
+          <p>最終送信: ${esc(uploadTimeText())} / 結果: ${esc(settings.lastUploadResult.ifEmpty { "なし" })}</p>
+          <button type="submit">保存</button>
+          <button type="submit" name="clearToken" value="1">トークンを削除</button>
         </form>
         <hr style="margin:2em 0">
         <h3>アプリ更新</h3>
