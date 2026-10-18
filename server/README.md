@@ -30,6 +30,19 @@ systemdなどで常駐させ、nginxやCaddyでHTTPS化して公開してくだ�
 
 管理画面(`http://<端末IP>:8080`)の「温湿度の外部送信」で、URLに `https://<ドメイン>/ingest`、トークンに `TOKEN` の値を入れて有効にします。
 
+## iPhoneのウィジェット (Scriptable)
+
+HomebridgeやHomeKitを使わずに、ウィジェットでサーバーの値を直接表示できます。
+
+1. App Storeの無料アプリ「Scriptable」を入れる。
+2. 新規スクリプトを作り、[scriptable-widget.js](./scriptable-widget.js) の内容を貼り付ける。
+   先頭の `BASE_URL` と `SENSOR_IDS` を自分の環境に合わせる。
+3. Scriptable内でスクリプトを実行し、`TOKEN` を入力する(iPhoneのキーチェーンに保存され、スクリプトには残らない)。
+4. ホーム画面かロック画面にScriptableのウィジェットを追加し、「スクリプト」にこのスクリプトを選ぶ。
+   小・中サイズのほか、ロック画面の四角形・インラインにも対応する。
+
+更新間隔はiOS任せで、数分から十数分かかる。15分以上古い値には「(古い)」と出る。
+
 ## HomeKit (Homebridge)
 
 `homebridge-http-temperature-humidity` を入れ、`config.json` の `accessories` に追加します。
